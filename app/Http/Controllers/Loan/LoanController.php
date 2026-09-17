@@ -52,20 +52,65 @@ class LoanController extends Controller
         return view('loans.index', compact('loans', 'stats'));
     }
 
-    public function overdue()
+    public function overdue(Request $request)
     {
         Loan::refreshOverdueStatus();
 
-        $query = Loan::with(['member', 'product', 'area'])
+        $query = Loan::with(['member', 'product', 'area', 'fieldOfficer', 'schedules'])
             ->where('status', 'overdue');
 
         if (auth()->user()->isFieldOfficer()) {
             $query->whereIn('area_id', auth()->user()->officerAreaIds());
         }
 
-        $loans = $query->orderByDesc('id')->paginate(20);
+        if ($request->filled('search')) {
+            $search = trim($request->input('search'));
+            $query->where(function ($q) use ($search) {
+                $q->where('loan_no', 'like', "%{$search}%")
+                    ->orWhereHas('member', function ($m) use ($search) {
+                        $m->where('name', 'like', "%{$search}%")
+                            ->orWhere('member_no', 'like', "%{$search}%")
+                            ->orWhere('mobile', 'like', "%{$search}%");
+                    });
+            });
+        }
 
-        return view('loans.overdue', compact('loans'));
+        if ($request->filled('loan_product_id')) {
+            $query->where('loan_product_id', $request->input('loan_product_id'));
+        }
+
+        if ($request->filled('frequency')) {
+            $query->where('frequency', $request->input('frequency'));
+        }
+
+        if ($request->filled('area_id')) {
+            $query->where('area_id', $request->input('area_id'));
+        }
+
+        if ($request->filled('field_officer_id')) {
+            $query->where('field_officer_id', $request->input('field_officer_id'));
+        }
+
+        $statsQuery = clone $query;
+        $totalOverdueCount = (clone $statsQuery)->count();
+        $totalOverdueOutstanding = (clone $statsQuery)->sum('outstanding');
+
+        $loans = $query->orderByDesc('id')->paginate(20)->withQueryString();
+
+        $products = \App\Models\LoanProduct::orderBy('name')->get();
+        $areas = auth()->user()->isFieldOfficer()
+            ? \App\Models\Area::active()->whereIn('id', auth()->user()->officerAreaIds())->orderBy('name')->get()
+            : \App\Models\Area::active()->orderBy('name')->get();
+        $officers = \App\Models\User::officers()->active()->orderBy('name')->get();
+
+        return view('loans.overdue', compact(
+            'loans',
+            'products',
+            'areas',
+            'officers',
+            'totalOverdueCount',
+            'totalOverdueOutstanding'
+        ));
     }
 
     public function show(Loan $loan)

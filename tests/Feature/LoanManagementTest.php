@@ -229,4 +229,37 @@ class LoanManagementTest extends TestCase
         $response->assertStatus(403);
         $this->assertDatabaseHas('loans', ['id' => $loan->id]);
     }
+
+    public function test_overdue_loans_can_be_filtered(): void
+    {
+        $loan1 = $this->createLoan(10000, 10, 10);
+        $loan1->update(['status' => 'overdue', 'frequency' => 'monthly']);
+
+        $loan2 = $this->createLoan(5000, 5, 10);
+        $loan2->update(['status' => 'overdue', 'frequency' => 'weekly']);
+
+        // 1. View all overdue
+        $res = $this->actingAs($this->admin)->get(route('loans.overdue'));
+        $res->assertOk();
+        $res->assertSee($loan1->loan_no);
+        $res->assertSee($loan2->loan_no);
+
+        // 2. Filter by search
+        $searchRes = $this->actingAs($this->admin)->get(route('loans.overdue', ['search' => $loan1->loan_no]));
+        $searchRes->assertOk();
+        $searchRes->assertSee($loan1->loan_no);
+        $searchRes->assertDontSee($loan2->loan_no);
+
+        // 3. Filter by frequency
+        $freqRes = $this->actingAs($this->admin)->get(route('loans.overdue', ['frequency' => 'weekly']));
+        $freqRes->assertOk();
+        $freqRes->assertSee($loan2->loan_no);
+        $freqRes->assertDontSee($loan1->loan_no);
+
+        // 4. Filter by product
+        $prodRes = $this->actingAs($this->admin)->get(route('loans.overdue', ['loan_product_id' => $loan1->loan_product_id]));
+        $prodRes->assertOk();
+        $prodRes->assertSee($loan1->loan_no);
+    }
 }
+
