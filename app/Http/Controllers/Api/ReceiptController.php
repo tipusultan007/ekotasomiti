@@ -30,11 +30,15 @@ class ReceiptController extends Controller
 
     protected function savings(int $id, string $orgName, string $orgAddress, string $orgPhone): ?array
     {
-        $txn = SavingsTransaction::with(['member', 'account.program', 'fieldOfficer', 'receiver'])->find($id);
+        $txn = SavingsTransaction::with(['member', 'account.program.fund', 'fundTransaction.fund', 'fieldOfficer', 'receiver'])->find($id);
 
         if (! $txn) {
             return null;
         }
+
+        $grossAmount = (float) ($txn->gross_amount ?? $txn->amount);
+        $fundAmount = (float) ($txn->fund_amount ?? 0);
+        $fundName = $txn->fundTransaction?->fund?->name ?? $txn->account?->program?->fund?->name ?? __('Welfare Fund');
 
         return [
             'org_name' => $orgName,
@@ -49,6 +53,9 @@ class ReceiptController extends Controller
             'account_no' => $txn->account->account_no,
             'program' => $txn->account->program->name,
             'amount' => $txn->amount,
+            'gross_amount' => $grossAmount,
+            'fund_amount' => $fundAmount,
+            'fund_name' => $fundName,
             'payment_method' => $txn->payment_method,
             'field_officer' => $txn->fieldOfficer?->name,
             'received_by' => $txn->receiver?->name,

@@ -68,12 +68,21 @@ class ReceiptScreen extends ConsumerWidget {
 
   void _shareReceipt(Map<String, dynamic> data) {
     final buffer = StringBuffer();
+    final grossAmount = (data['gross_amount'] as num?)?.toDouble() ?? ((data['amount'] as num?)?.toDouble() ?? 0);
+    final fundAmount = (data['fund_amount'] as num?)?.toDouble() ?? 0.0;
+    final fundName = data['fund_name']?.toString() ?? 'কল্যাণ তহবিল';
+    final netAmount = (data['amount'] as num?)?.toDouble() ?? 0.0;
+
     buffer.writeln('--- জমার রশিদ ---');
     buffer.writeln('${data['type_label'] ?? 'কালেকশন'} রশিদ');
     buffer.writeln('রশিদ নং: ${data['receipt_no'] ?? ''}');
     buffer.writeln('তারিখ: ${DateFormatter.human(data['date'], showTime: true)}');
     buffer.writeln('সদস্য: ${data['member_name'] ?? ''} (${data['member_no'] ?? ''})');
-    buffer.writeln('আদায়কৃত টাকা: ${CurrencyFormatter.simple((data['amount'] as num?)?.toDouble() ?? 0)}');
+    buffer.writeln('আদায়কৃত মোট টাকা: ${CurrencyFormatter.simple(grossAmount > 0 ? grossAmount : netAmount)}');
+    if (fundAmount > 0) {
+      buffer.writeln('$fundName: ${CurrencyFormatter.simple(fundAmount)}');
+      buffer.writeln('সঞ্চয় জমা: ${CurrencyFormatter.simple(netAmount)}');
+    }
     if (data['principal_paid'] != null) buffer.writeln('মূল পরিশোধ: ${CurrencyFormatter.simple((data['principal_paid'] as num?)?.toDouble() ?? 0)}');
     if (data['interest_paid'] != null) buffer.writeln('মুনাফা: ${CurrencyFormatter.simple((data['interest_paid'] as num?)?.toDouble() ?? 0)}');
     buffer.writeln('পেমেন্ট মাধ্যম: ${data['payment_method'] ?? 'নগদ'}');
@@ -90,6 +99,11 @@ class ReceiptScreen extends ConsumerWidget {
   }
 
   Widget _buildReceipt(BuildContext context, Map<String, dynamic> data) {
+    final grossAmount = (data['gross_amount'] as num?)?.toDouble() ?? ((data['amount'] as num?)?.toDouble() ?? 0);
+    final fundAmount = (data['fund_amount'] as num?)?.toDouble() ?? 0.0;
+    final fundName = data['fund_name']?.toString() ?? 'কল্যাণ তহবিল';
+    final netAmount = (data['amount'] as num?)?.toDouble() ?? 0.0;
+
     return SingleChildScrollView(
       padding: const EdgeInsets.all(16),
       child: Container(
@@ -121,7 +135,11 @@ class ReceiptScreen extends ConsumerWidget {
             _row('হিসাব নম্বর', '${data['account_no'] ?? ''}'),
             if (data['program'] != null) _row('স্কিম / প্রোগ্রাম', '${data['program']}'),
             const Divider(height: 20),
-            _row('আদায়কৃত মোট টাকা', CurrencyFormatter.simple((data['amount'] as num?)?.toDouble() ?? 0), bold: true, color: const Color(0xFF059669)),
+            _row('আদায়কৃত মোট টাকা', CurrencyFormatter.simple(grossAmount > 0 ? grossAmount : netAmount), bold: true, color: const Color(0xFF059669)),
+            if (fundAmount > 0) ...[
+              _row(fundName, CurrencyFormatter.simple(fundAmount), color: const Color(0xFFD97706)),
+              _row('সঞ্চয় হিসাবে জমা', CurrencyFormatter.simple(netAmount)),
+            ],
             if (data['principal_paid'] != null) _row('মূল কিস্তি', CurrencyFormatter.simple((data['principal_paid'] as num?)?.toDouble() ?? 0)),
             if (data['interest_paid'] != null) _row('মুনাফা / সুদ', CurrencyFormatter.simple((data['interest_paid'] as num?)?.toDouble() ?? 0)),
             _row('পেমেন্ট মাধ্যম', data['payment_method'] == 'cash' ? 'নগদ' : '${data['payment_method']}'),

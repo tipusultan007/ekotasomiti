@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:io';
+import 'dart:math' as math;
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -89,10 +90,12 @@ class _LoanApplicationScreenState extends ConsumerState<LoanApplicationScreen> {
 
   final _amountController = TextEditingController();
   final _termController = TextEditingController();
+  final _installmentController = TextEditingController();
   final _purposeController = TextEditingController();
   final _remarksController = TextEditingController();
   final _searchController = TextEditingController();
 
+  bool _isInstallmentManuallyEdited = false;
   Timer? _debounce;
 
   int? _selectedMemberId;
@@ -118,12 +121,20 @@ class _LoanApplicationScreenState extends ConsumerState<LoanApplicationScreen> {
   @override
   void initState() {
     super.initState();
-    _amountController.addListener(() => setState(() {}));
-    _termController.addListener(() => setState(() {}));
+    _amountController.addListener(_onAmountOrTermChanged);
+    _termController.addListener(_onAmountOrTermChanged);
+    _installmentController.addListener(() => setState(() {}));
 
     if (widget.initialMemberId != null) {
       _selectedMemberId = widget.initialMemberId;
     }
+  }
+
+  void _onAmountOrTermChanged() {
+    if (!_isInstallmentManuallyEdited) {
+      _autoCalculateInstallment();
+    }
+    setState(() {});
   }
 
   @override
@@ -131,6 +142,7 @@ class _LoanApplicationScreenState extends ConsumerState<LoanApplicationScreen> {
     _debounce?.cancel();
     _amountController.dispose();
     _termController.dispose();
+    _installmentController.dispose();
     _purposeController.dispose();
     _remarksController.dispose();
     _searchController.dispose();
@@ -261,9 +273,47 @@ class _LoanApplicationScreenState extends ConsumerState<LoanApplicationScreen> {
     }
   }
 
+  double _calculateDefaultInstallment() {
+    final amount = double.tryParse(_amountController.text) ?? 0.0;
+    final term = int.tryParse(_termController.text) ?? 0;
+    if (amount <= 0 || term <= 0 || _selectedProduct == null) return 0.0;
+
+    final rate = _selectedProduct!.interestRate;
+    final isReducing = _selectedProduct!.interestType.toLowerCase() == 'reducing';
+    final freq = _selectedProduct!.frequency.toLowerCase();
+
+    if (isReducing) {
+      double periodDivider = 12.0;
+      if (freq == 'daily') {
+        periodDivider = 365.0;
+      } else if (freq == 'weekly') {
+        periodDivider = 52.0;
+      }
+      final periodRate = (rate / periodDivider) / 100.0;
+      if (periodRate > 0 && term > 0) {
+        final factor = math.pow(1.0 + periodRate, term).toDouble();
+        return (amount * periodRate * factor) / (factor - 1.0);
+      }
+    }
+
+    final totalInterest = amount * (rate / 100.0);
+    final totalPayable = amount + totalInterest;
+    return totalPayable / term;
+  }
+
+  void _autoCalculateInstallment() {
+    final calculated = _calculateDefaultInstallment();
+    if (calculated > 0) {
+      _installmentController.text = calculated.toStringAsFixed(2);
+    } else {
+      _installmentController.clear();
+    }
+  }
+
   void _onProductSelected(LoanProduct? p) {
     setState(() {
       _selectedProduct = p;
+      _isInstallmentManuallyEdited = false;
       if (p != null) {
         if (_termController.text.isEmpty || int.tryParse(_termController.text) == 0) {
           _termController.text = '${p.minTerm}';
@@ -283,6 +333,7 @@ class _LoanApplicationScreenState extends ConsumerState<LoanApplicationScreen> {
             _firstDueDate = now.add(const Duration(days: 7));
         }
       }
+      _autoCalculateInstallment();
     });
   }
 
@@ -299,6 +350,7 @@ class _LoanApplicationScreenState extends ConsumerState<LoanApplicationScreen> {
 
     final requestedAmount = double.tryParse(_amountController.text) ?? 0;
     final requestedTerm = int.tryParse(_termController.text) ?? 0;
+    final requestedInstallment = double.tryParse(_installmentController.text) ?? 0;
 
     if (requestedAmount <= 0) {
       _showErrorSnackBar('লোনের পরিমাণ ০ এর বেশি হতে হবে');
@@ -314,6 +366,10 @@ class _LoanApplicationScreenState extends ConsumerState<LoanApplicationScreen> {
     }
     if (requestedTerm < _selectedProduct!.minTerm || requestedTerm > _selectedProduct!.maxTerm) {
       _showErrorSnackBar('কিস্তির সংখ্যা ${_selectedProduct!.minTerm} থেকে ${_selectedProduct!.maxTerm} এর মধ্যে হতে হবে');
+      return;
+    }
+    if (requestedInstallment <= 0) {
+      _showErrorSnackBar('অনুগ্রহ করে সঠিক কিস্তির পরিমাণ লিখুন');
       return;
     }
 
@@ -338,6 +394,7 @@ class _LoanApplicationScreenState extends ConsumerState<LoanApplicationScreen> {
         MapEntry('loan_product_id', _selectedProduct!.id.toString()),
         MapEntry('requested_amount', requestedAmount.toString()),
         MapEntry('requested_term', requestedTerm.toString()),
+        MapEntry('installment_amount', requestedInstallment.toStringAsFixed(2)),
         MapEntry('purpose', _purposeController.text.trim()),
         MapEntry('remarks', _remarksController.text.trim()),
         MapEntry('application_date', DateFormatter.api(_applicationDate)),
@@ -836,9 +893,26 @@ class _LoanApplicationScreenState extends ConsumerState<LoanApplicationScreen> {
     final frequency = _selectedProduct?.frequency ?? 'monthly';
     final freqLabel = frequency == 'daily' ? 'দিন' : (frequency == 'weekly' ? 'সপ্তাহ' : 'মাস');
 
-    final totalInterest = amount * (rate / 100);
-    final totalRepayable = amount + totalInterest;
-    final estimatedInstallment = (term > 0) ? (totalRepayable / term) : 0.0;
+    final manualInstallment = double.tryParse(_installmentController.text) ?? 0.0;
+    double totalRepayable = 0.0;
+    double totalInterest = 0.0;
+    double finalInstallment = 0.0;
+
+    if (manualInstallment > 0) {
+      finalInstallment = manualInstallment;
+      totalRepayable = term > 0 ? (manualInstallment * term) : amount;
+      totalInterest = math.max(0.0, totalRepayable - amount);
+    } else {
+      final defaultInst = _calculateDefaultInstallment();
+      finalInstallment = defaultInst;
+      if (_selectedProduct?.interestType.toLowerCase() == 'reducing' && term > 0 && defaultInst > 0) {
+        totalRepayable = defaultInst * term;
+        totalInterest = math.max(0.0, totalRepayable - amount);
+      } else {
+        totalInterest = amount * (rate / 100);
+        totalRepayable = amount + totalInterest;
+      }
+    }
 
     return Container(
       decoration: BoxDecoration(
@@ -862,7 +936,7 @@ class _LoanApplicationScreenState extends ConsumerState<LoanApplicationScreen> {
               Icon(Icons.calculate_outlined, color: Color(0xFF2563EB), size: 18),
               SizedBox(width: 8),
               Text(
-                'লোনের পরিমাণ ও কিস্তির মেয়াদ *',
+                'লোনের পরিমাণ ও কিস্তির বিবরণ *',
                 style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: Color(0xFF0F172A)),
               ),
             ],
@@ -903,7 +977,7 @@ class _LoanApplicationScreenState extends ConsumerState<LoanApplicationScreen> {
                   keyboardType: TextInputType.number,
                   style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
                   decoration: InputDecoration(
-                    labelText: 'মেয়াদ (কিস্তি সংখ্যা) *',
+                    labelText: 'মেয়াদ (কিস্তি) *',
                     hintText: 'যেমন: ১২',
                     filled: true,
                     fillColor: const Color(0xFFF8FAFC),
@@ -921,6 +995,61 @@ class _LoanApplicationScreenState extends ConsumerState<LoanApplicationScreen> {
                 ),
               ),
             ],
+          ),
+
+          const SizedBox(height: 12),
+
+          // Manual Installment Amount Field
+          TextFormField(
+            controller: _installmentController,
+            keyboardType: const TextInputType.numberWithOptions(decimal: true),
+            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: Color(0xFF1D4ED8)),
+            decoration: InputDecoration(
+              labelText: 'প্রতি কিস্তির পরিমাণ (ম্যানুয়াল নির্ধারণযোগ্য) *',
+              hintText: '0.00',
+              prefixText: '৳ ',
+              prefixStyle: const TextStyle(fontWeight: FontWeight.bold, color: Color(0xFF1D4ED8)),
+              suffixIcon: _isInstallmentManuallyEdited
+                  ? TextButton.icon(
+                      onPressed: () {
+                        setState(() {
+                          _isInstallmentManuallyEdited = false;
+                          _autoCalculateInstallment();
+                        });
+                      },
+                      icon: const Icon(Icons.refresh_rounded, size: 14, color: Color(0xFF2563EB)),
+                      label: const Text('স্বয়ংক্রিয়', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Color(0xFF2563EB))),
+                      style: TextButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(horizontal: 8),
+                      ),
+                    )
+                  : const Padding(
+                      padding: EdgeInsets.only(right: 12),
+                      child: Tooltip(
+                        message: 'স্বয়ংক্রিয়ভাবে হিসাবকৃত',
+                        child: Icon(Icons.auto_awesome_rounded, size: 18, color: Color(0xFF2563EB)),
+                      ),
+                    ),
+              filled: true,
+              fillColor: const Color(0xFFEFF6FF),
+              border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: Color(0xFFBFDBFE))),
+              enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: Color(0xFFBFDBFE))),
+              focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: Color(0xFF2563EB), width: 1.5)),
+              contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+              helperText: 'ফিল্ড অফিসার চাইলে এই কিস্তির পরিমাণ ম্যানুয়ালি পরিবর্তন করতে পারেন',
+              helperStyle: TextStyle(fontSize: 11, color: Colors.grey.shade600),
+            ),
+            onChanged: (val) {
+              setState(() {
+                _isInstallmentManuallyEdited = true;
+              });
+            },
+            validator: (v) {
+              if (v == null || v.trim().isEmpty) return 'কিস্তির পরিমাণ আবশ্যক';
+              final val = double.tryParse(v);
+              if (val == null || val <= 0) return 'সঠিক কিস্তির পরিমাণ লিখুন';
+              return null;
+            },
           ),
 
           const SizedBox(height: 14),
@@ -976,7 +1105,7 @@ class _LoanApplicationScreenState extends ConsumerState<LoanApplicationScreen> {
                         Text('প্রতি $freqLabel কিস্তির পরিমাণ', style: const TextStyle(color: Colors.white60, fontSize: 10)),
                         const SizedBox(height: 2),
                         Text(
-                          CurrencyFormatter.simple(estimatedInstallment),
+                          CurrencyFormatter.simple(finalInstallment),
                           style: const TextStyle(color: Color(0xFF6EE7B7), fontSize: 13, fontWeight: FontWeight.w900),
                         ),
                       ],
