@@ -29,11 +29,9 @@
                         </div>
                         <div class="col-md-6">
                             <label class="form-label fw-semibold">{{ __('Loan Product') }} <span class="text-danger">*</span></label>
-                            <select name="loan_product_id" class="form-select select2" required>
                             <select name="loan_product_id" id="loan_product_id" class="form-select select2" required>
                                 <option value="">{{ __('Select Product') }}</option>
                                 @foreach ($products as $product)
-                                    <option value="{{ $product->id }}" @selected(old('loan_product_id') == $product->id)>{{ __($product->name) }} ({{ __(ucfirst($product->frequency)) }} • {{ $product->interest_rate }}%)</option>
                                     <option value="{{ $product->id }}"
                                         data-rate="{{ $product->interest_rate }}"
                                         data-type="{{ $product->interest_type ?? 'flat' }}"
@@ -48,20 +46,25 @@
                                 @endforeach
                             </select>
                         </div>
-                        <div class="col-md-4">
+                        <div class="col-md-3">
                             <label class="form-label fw-semibold">{{ __('Requested Amount') }} <span class="text-danger">*</span></label>
                             <div class="input-group">
                                 <span class="input-group-text">৳</span>
-                                <input type="number" step="0.01" min="0.01" name="requested_amount" class="form-control" value="{{ old('requested_amount') }}" placeholder="0.00" required>
                                 <input type="number" step="0.01" min="0.01" name="requested_amount" id="requested_amount" class="form-control" value="{{ old('requested_amount') }}" placeholder="0.00" required>
                             </div>
                         </div>
-                        <div class="col-md-4">
+                        <div class="col-md-3">
                             <label class="form-label fw-semibold">{{ __('Requested Term') }} <span class="text-danger">*</span></label>
-                            <input type="number" min="1" name="requested_term" class="form-control" value="{{ old('requested_term') }}" placeholder="{{ __('Installments count') }}" required>
                             <input type="number" min="1" name="requested_term" id="requested_term" class="form-control" value="{{ old('requested_term') }}" placeholder="{{ __('Installments count') }}" required>
                         </div>
-                        <div class="col-md-4">
+                        <div class="col-md-3">
+                            <label class="form-label fw-semibold text-primary">{{ __('Installment Amount') }} <span class="text-danger">*</span></label>
+                            <div class="input-group">
+                                <span class="input-group-text bg-primary-subtle text-primary fw-bold">৳</span>
+                                <input type="number" step="0.01" min="0.01" name="installment_amount" id="installment_amount" class="form-control fw-bold text-primary" value="{{ old('installment_amount') }}" placeholder="0.00" required>
+                            </div>
+                        </div>
+                        <div class="col-md-3">
                             <label class="form-label fw-semibold">{{ __('Application Date') }} <span class="text-danger">*</span></label>
                             <input type="date" name="application_date" class="form-control" value="{{ old('application_date', now()->toDateString()) }}" required>
                         </div>
@@ -295,11 +298,12 @@
         const productSelect = document.getElementById('loan_product_id');
         const amountInput = document.getElementById('requested_amount');
         const termInput = document.getElementById('requested_term');
+        const installmentInput = document.getElementById('installment_amount');
         const summaryBox = document.getElementById('loan-calculation-summary');
 
         if (!productSelect || !amountInput || !termInput || !summaryBox) return;
 
-        function updateCalculation() {
+        function updateCalculation(fromManualInstallment = false) {
             const selectedOption = productSelect.options[productSelect.selectedIndex];
             const principal = parseFloat(amountInput.value) || 0;
             const term = parseInt(termInput.value, 10) || 0;
@@ -315,7 +319,7 @@
 
             let totalInterest = 0;
             let totalPayable = 0;
-            let installment = 0;
+            let calculatedInstallment = 0;
 
             if (type === 'reducing') {
                 let periodDivider = 12;
@@ -325,19 +329,48 @@
                 const periodRate = (rate / periodDivider) / 100;
                 if (periodRate > 0 && term > 0) {
                     const factor = Math.pow(1 + periodRate, term);
-                    installment = principal * periodRate * factor / (factor - 1);
-                    totalPayable = installment * term;
+                    calculatedInstallment = principal * periodRate * factor / (factor - 1);
+                    totalPayable = calculatedInstallment * term;
                     totalInterest = totalPayable - principal;
                 } else {
                     totalInterest = principal * (rate / 100);
                     totalPayable = principal + totalInterest;
-                    installment = term > 0 ? (totalPayable / term) : 0;
+                    calculatedInstallment = term > 0 ? (totalPayable / term) : 0;
                 }
             } else {
                 // Flat interest calculation: Principal * Rate%
                 totalInterest = principal * (rate / 100);
                 totalPayable = principal + totalInterest;
-                installment = term > 0 ? (totalPayable / term) : 0;
+                calculatedInstallment = term > 0 ? (totalPayable / term) : 0;
+            }
+
+            let finalInstallment = calculatedInstallment;
+
+            if (fromManualInstallment && installmentInput) {
+                const manual = parseFloat(installmentInput.value) || 0;
+                if (manual > 0) {
+                    finalInstallment = manual;
+                    if (term > 0) {
+                        totalPayable = manual * term;
+                        totalInterest = Math.max(0, totalPayable - principal);
+                    }
+                }
+            } else if (installmentInput) {
+                // Only auto-fill if not manually edited or if input is empty
+                if (!installmentInput.dataset.manualEdited || !installmentInput.value) {
+                    if (calculatedInstallment > 0) {
+                        installmentInput.value = calculatedInstallment.toFixed(2);
+                    }
+                } else {
+                    const manual = parseFloat(installmentInput.value) || 0;
+                    if (manual > 0) {
+                        finalInstallment = manual;
+                        if (term > 0) {
+                            totalPayable = manual * term;
+                            totalInterest = Math.max(0, totalPayable - principal);
+                        }
+                    }
+                }
             }
 
             const typeLabel = type === 'reducing' ? 'Reducing' : 'Flat';
@@ -349,7 +382,7 @@
             document.getElementById('calc-total-payable').textContent = '৳' + Math.max(0, totalPayable).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
             if (term > 0) {
-                document.getElementById('calc-installment').textContent = '৳' + installment.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+                document.getElementById('calc-installment').textContent = '৳' + finalInstallment.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
                 document.getElementById('calc-installment-note').textContent = term + ' installments';
             } else {
                 document.getElementById('calc-installment').textContent = '-';
@@ -364,16 +397,30 @@
             if (opt && opt.value && !termInput.value && opt.dataset.minTerm) {
                 termInput.value = opt.dataset.minTerm;
             }
-            updateCalculation();
+            if (installmentInput) {
+                installmentInput.dataset.manualEdited = '';
+            }
+            updateCalculation(false);
         });
 
-        amountInput.addEventListener('input', updateCalculation);
-        amountInput.addEventListener('change', updateCalculation);
-        termInput.addEventListener('input', updateCalculation);
-        termInput.addEventListener('change', updateCalculation);
+        amountInput.addEventListener('input', () => updateCalculation(false));
+        amountInput.addEventListener('change', () => updateCalculation(false));
+        termInput.addEventListener('input', () => updateCalculation(false));
+        termInput.addEventListener('change', () => updateCalculation(false));
+
+        if (installmentInput) {
+            installmentInput.addEventListener('input', function () {
+                this.dataset.manualEdited = 'true';
+                updateCalculation(true);
+            });
+            installmentInput.addEventListener('change', function () {
+                this.dataset.manualEdited = 'true';
+                updateCalculation(true);
+            });
+        }
 
         if (productSelect.value && amountInput.value) {
-            updateCalculation();
+            updateCalculation(false);
         }
     })();
 

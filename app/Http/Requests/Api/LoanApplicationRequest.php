@@ -25,6 +25,7 @@ class LoanApplicationRequest extends FormRequest
             'loan_product_id' => 'required|exists:loan_products,id',
             'requested_amount' => 'required|numeric|gt:0|max:10000000',
             'requested_term' => 'required|integer|min:1|max:360',
+            'installment_amount' => 'nullable|numeric|gt:0',
             'purpose' => 'nullable|string|max:255',
             'application_date' => 'required|date|before_or_equal:today',
             'disbursement_date' => 'required|date|before_or_equal:today',

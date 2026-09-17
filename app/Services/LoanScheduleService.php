@@ -14,7 +14,18 @@ class LoanScheduleService
         $term = (int) $loan->term;
         $rate = (float) $loan->interest_rate;
 
-        [$totalInterest, $totalPayable, $installment] = $this->calculate($loan, $principal, $term, $rate);
+        [$calcInterest, $calcPayable, $calcInstallment] = $this->calculate($loan, $principal, $term, $rate);
+
+        // If installment_amount was manually specified (> 0), use it; otherwise use calculated installment
+        if ((float) $loan->installment_amount > 0) {
+            $installment = (float) $loan->installment_amount;
+            $totalPayable = round($installment * $term, 2);
+            $totalInterest = max(0, round($totalPayable - $principal, 2));
+        } else {
+            $installment = $calcInstallment;
+            $totalPayable = $calcPayable;
+            $totalInterest = $calcInterest;
+        }
 
         $loan->total_interest = $totalInterest;
         $loan->total_payable = $totalPayable;
@@ -22,8 +33,8 @@ class LoanScheduleService
         $loan->outstanding = $totalPayable;
         $loan->save();
 
-        $principalPer = $principal / $term;
-        $interestPer = $totalInterest / $term;
+        $principalPer = $term > 0 ? round($principal / $term, 2) : 0;
+        $interestPer = $term > 0 ? round($totalInterest / $term, 2) : 0;
 
         $start = $loan->first_due_date?->copy() ?? \Carbon\Carbon::parse($loan->disbursement_date)->addDay();
 
@@ -43,7 +54,7 @@ class LoanScheduleService
                 'due_date' => $dueDate,
                 'principal' => $principalPer,
                 'interest' => $interestPer,
-                'total' => $principalPer + $interestPer,
+                'total' => $installment,
                 'paid' => 0,
                 'status' => 'due',
             ]);

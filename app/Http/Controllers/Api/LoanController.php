@@ -173,13 +173,18 @@ class LoanController extends Controller
         $member = Member::findOrFail($data['member_id']);
         $product = LoanProduct::findOrFail($data['loan_product_id']);
 
-        $installment = (new LoanScheduleService())->calculate(
+        $calcInstallment = (new LoanScheduleService())->calculate(
             new Loan(['interest_type' => $product->interest_type, 'frequency' => $product->frequency]),
             (float) $data['requested_amount'],
             (int) $data['requested_term'],
             (float) $product->interest_rate
         )[2];
 
+        $installment = !empty($data['installment_amount']) && (float) $data['installment_amount'] > 0
+            ? (float) $data['installment_amount']
+            : $calcInstallment;
+
+        $data['installment_amount'] = $installment;
         $data['application_no'] = app(\App\Services\AccountNumberService::class)->nextTransactionNumber('loan_application', 'LA-', true, $data['application_date']);
         $data['created_by'] = $officer->id;
         $data['status'] = 'approved';
@@ -204,6 +209,7 @@ class LoanController extends Controller
             }
 
             $loan = app(LoanDisbursementService::class)->disburse($application, [
+                'installment_amount' => $installment,
                 'disbursement_date' => $data['disbursement_date'],
                 'first_due_date' => $data['first_due_date'],
                 'payment_method' => $data['payment_method'],

@@ -250,6 +250,7 @@ class LoanController extends Controller
             $rules['principal_amount'] = 'required|numeric|gt:0';
             $rules['interest_rate'] = 'required|numeric|gte:0';
             $rules['term'] = 'required|integer|gt:0';
+            $rules['installment_amount'] = 'nullable|numeric|gt:0';
         }
 
         $data = $request->validate($rules);
@@ -277,6 +278,7 @@ class LoanController extends Controller
                     'principal_amount' => $principal,
                     'interest_rate' => $rate,
                     'term' => $term,
+                    'installment_amount' => !empty($data['installment_amount']) ? (float) $data['installment_amount'] : $loan->installment_amount,
                     'disbursement_date' => $disbursementDate,
                     'first_due_date' => $firstDueDate,
                     'status' => $data['status'],

@@ -47,7 +47,7 @@
         <div class="table-responsive" style="min-height: 220px;">
             <table class="table table-hover align-middle mb-0">
             <thead>
-                <tr><th>{{ __('Loan No') }}</th><th>{{ __('Member') }}</th><th>{{ __('Product') }}</th><th class="text-end">{{ __('Principal') }}</th><th class="text-end">{{ __('Outstanding') }}</th><th>{{ __('Due Date') }}</th><th>{{ __('Status') }}</th><th class="text-end">{{ __('Actions') }}</th></tr>
+                <tr><th>{{ __('Loan No') }}</th><th>{{ __('Member') }}</th><th>{{ __('Product') }}</th><th class="text-end">{{ __('Principal') }}</th><th class="text-end text-primary">{{ __('Installment') }}</th><th class="text-end">{{ __('Outstanding') }}</th><th>{{ __('Due Date') }}</th><th>{{ __('Status') }}</th><th class="text-end">{{ __('Actions') }}</th></tr>
             </thead>
             <tbody>
                 @forelse ($loans as $loan)
@@ -76,6 +76,7 @@
                             </span>
                         </td>
                         <td class="amount">৳{{ number_format($loan->principal_amount, 2) }}</td>
+                        <td class="amount fw-bold text-primary">৳{{ number_format($loan->installment_amount, 2) }}</td>
                         <td class="amount fw-semibold {{ $loan->status === 'overdue' ? 'text-danger' : '' }}">৳{{ number_format($loan->outstanding, 2) }}</td>
                         <td>{{ $loan->schedules?->first(fn ($s) => in_array($s->status, ['due', 'partial', 'overdue']))?->due_date?->format('d-m-Y') }}</td>
                         <td><span class="badge {{ match($loan->status) { 'completed' => 'bg-success-subtle text-success', 'overdue' => 'bg-danger-subtle text-danger', 'active' => 'bg-info-subtle text-info', 'written_off' => 'bg-dark-subtle text-dark', default => 'bg-secondary-subtle text-secondary' } }}">{{ __(ucfirst($loan->status)) }}</span></td>

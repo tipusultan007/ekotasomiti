@@ -96,13 +96,18 @@ class LoanApplicationController extends Controller
         $data = $this->validateData($request);
 
         $product = LoanProduct::findOrFail($data['loan_product_id']);
-        $installment = (new \App\Services\LoanScheduleService())->calculate(
+        $calcInstallment = (new \App\Services\LoanScheduleService())->calculate(
             new \App\Models\Loan(['interest_type' => $product->interest_type, 'frequency' => $product->frequency]),
             (float) $data['requested_amount'],
             (int) $data['requested_term'],
             (float) $product->interest_rate
         )[2];
 
+        $installment = !empty($data['installment_amount']) && (float) $data['installment_amount'] > 0
+            ? (float) $data['installment_amount']
+            : $calcInstallment;
+
+        $data['installment_amount'] = $installment;
         $data['application_no'] = app(AccountNumberService::class)->nextTransactionNumber('loan_application', 'LA-', true, $data['application_date']);
         $data['created_by'] = auth()->id();
         $data['status'] = 'approved';
@@ -169,6 +174,7 @@ class LoanApplicationController extends Controller
             'loan_product_id' => 'required|exists:loan_products,id',
             'requested_amount' => 'required|numeric|gt:0',
             'requested_term' => 'required|integer|min:1',
+            'installment_amount' => 'nullable|numeric|gt:0',
             'purpose' => 'nullable|string|max:255',
             'area_id' => $areaRule,
             'field_officer_id' => 'nullable|exists:users,id',

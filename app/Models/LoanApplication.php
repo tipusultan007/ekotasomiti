@@ -8,7 +8,7 @@ class LoanApplication extends Model
 {
     protected $fillable = [
         'application_no', 'member_id', 'loan_product_id', 'requested_amount',
-        'requested_term', 'purpose', 'area_id', 'field_officer_id', 'application_date',
+        'requested_term', 'installment_amount', 'purpose', 'area_id', 'field_officer_id', 'application_date',
         'status', 'verification_info', 'guarantor_info', 'documents_info', 'remarks',
         'created_by', 'reviewed_by', 'reviewed_at', 'approved_by', 'approved_at',
         'approved_amount', 'approved_interest_rate', 'approved_term',
@@ -24,6 +24,7 @@ class LoanApplication extends Model
             'approved_at' => 'datetime',
             'rejected_at' => 'datetime',
             'requested_amount' => 'decimal:2',
+            'installment_amount' => 'decimal:2',
             'approved_amount' => 'decimal:2',
             'approved_interest_rate' => 'decimal:2',
             'approved_installment' => 'decimal:2',

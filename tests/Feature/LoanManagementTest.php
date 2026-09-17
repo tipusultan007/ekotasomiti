@@ -80,11 +80,64 @@ class LoanManagementTest extends TestCase
     {
         $response = $this->actingAs($this->admin)->get(route('loans.applications.create'));
         $response->assertOk();
+        $response->assertSee('id="installment_amount"', false);
         $response->assertSee('id="loan-calculation-summary"', false);
         $response->assertSee('id="calc-total-payable"', false);
         $response->assertSee('id="calc-total-interest"', false);
         $response->assertSee('id="calc-principal"', false);
         $response->assertSee('id="calc-installment"', false);
+    }
+
+    public function test_loan_application_accepts_manual_installment_amount(): void
+    {
+        $response = $this->actingAs($this->admin)->post(route('loans.applications.store'), [
+            'member_id' => $this->member->id,
+            'loan_product_id' => $this->product->id,
+            'requested_amount' => 10000,
+            'requested_term' => 10,
+            'installment_amount' => 1250, // Manual installment set by user
+            'purpose' => 'Shop inventory expansion',
+            'area_id' => $this->area->id,
+            'field_officer_id' => $this->officer->id,
+            'application_date' => now()->toDateString(),
+            'disbursement_date' => now()->toDateString(),
+            'first_due_date' => now()->addDay()->toDateString(),
+            'payment_method' => 'cash',
+        ]);
+
+        $response->assertSessionHasNoErrors();
+
+        // 1. Verify LoanApplication stored the manual installment
+        $app = LoanApplication::where('member_id', $this->member->id)->latest('id')->first();
+        $this->assertNotNull($app);
+        $this->assertEquals(1250.00, (float) $app->installment_amount);
+        $this->assertEquals(1250.00, (float) $app->approved_installment);
+
+        // 2. Verify Loan has the exact manual installment_amount
+        $loan = Loan::where('application_id', $app->id)->first();
+        $this->assertNotNull($loan);
+        $this->assertEquals(1250.00, (float) $loan->installment_amount);
+        $this->assertEquals(12500.00, (float) $loan->total_payable); // 1250 * 10
+        $this->assertEquals(2500.00, (float) $loan->total_interest);
+
+        // 3. Verify Schedules each have the manual installment amount
+        $schedules = $loan->schedules;
+        $this->assertCount(10, $schedules);
+        foreach ($schedules as $schedule) {
+            $this->assertEquals(1250.00, (float) $schedule->total);
+        }
+
+        // 4. Verify loan show page and collection page reflect the manual installment
+        $loanResponse = $this->actingAs($this->admin)->get(route('loans.show', $loan));
+        $loanResponse->assertOk();
+        $loanResponse->assertSee('1,250');
+
+        $sheetResponse = $this->actingAs($this->officer)->get(route('collection.loans.sheet', [
+            'frequency' => $loan->frequency,
+            'date' => $loan->first_due_date->toDateString(),
+        ]));
+        $sheetResponse->assertOk();
+        $sheetResponse->assertSee('1,250');
     }
 
     public function test_admin_can_view_loan_edit_page(): void

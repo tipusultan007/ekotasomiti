@@ -79,6 +79,17 @@
                 </div>
 
                 <div class="col-md-4">
+                    <label class="form-label text-primary fw-semibold">{{ __('Installment Amount') }} <span class="text-danger">*</span></label>
+                    <div class="input-group">
+                        <span class="input-group-text bg-primary-subtle text-primary">৳</span>
+                        <input type="number" step="0.01" min="0.01" name="installment_amount" class="form-control fw-bold text-primary @error('installment_amount') is-invalid @enderror"
+                               value="{{ old('installment_amount', $loan->installment_amount) }}"
+                               @if($hasRepayments) readonly @else required @endif>
+                    </div>
+                    @error('installment_amount') <div class="text-danger small mt-1">{{ $message }}</div> @enderror
+                </div>
+
+                <div class="col-md-4">
                     <label class="form-label">{{ __('Disbursement Date') }} <span class="text-danger">*</span></label>
                     <input type="date" name="disbursement_date" class="form-control @error('disbursement_date') is-invalid @enderror"
                            value="{{ old('disbursement_date', $loan->disbursement_date?->format('Y-m-d')) }}" required>

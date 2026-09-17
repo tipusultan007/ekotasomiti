@@ -22,6 +22,7 @@
                     <tr><td>{{ __('Loan Product') }}</td><td>{{ $application->product->name }} ({{ $application->product->frequency }})</td></tr>
                     <tr><td>{{ __('Requested Amount') }}</td><td>৳{{ number_format($application->requested_amount, 2) }}</td></tr>
                     <tr><td>{{ __('Requested Term') }}</td><td>{{ $application->requested_term }}</td></tr>
+                    <tr><td>{{ __('Installment Amount') }}</td><td class="fw-bold text-primary">৳{{ number_format($application->installment_amount ?? $application->approved_installment, 2) }}</td></tr>
                     <tr><td>{{ __('Purpose') }}</td><td>{{ $application->purpose }}</td></tr>
                     <tr><td>{{ __('Area') }}</td><td>{{ $application->area?->name }}</td></tr>
                     <tr><td>{{ __('Field Officer') }}</td><td>{{ $application->fieldOfficer?->name }}</td></tr>

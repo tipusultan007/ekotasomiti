@@ -188,18 +188,23 @@ class OnboardingController extends Controller
                     $loanOfficerId = $member->field_officer_id;
                     $product = LoanProduct::findOrFail($loan['loan_product_id']);
 
-                    $installment = (new LoanScheduleService())->calculate(
+                    $calcInstallment = (new LoanScheduleService())->calculate(
                         new \App\Models\Loan(['interest_type' => $product->interest_type, 'frequency' => $product->frequency]),
                         (float) $loan['requested_amount'],
                         (int) $loan['requested_term'],
                         (float) $product->interest_rate
                     )[2];
 
+                    $installment = !empty($loan['installment_amount']) && (float) $loan['installment_amount'] > 0
+                        ? (float) $loan['installment_amount']
+                        : $calcInstallment;
+
                     $application = LoanApplication::create([
                         'member_id' => $member->id,
                         'loan_product_id' => $loan['loan_product_id'],
                         'requested_amount' => $loan['requested_amount'],
                         'requested_term' => $loan['requested_term'],
+                        'installment_amount' => $installment,
                         'purpose' => $loan['purpose'] ?? null,
                         'area_id' => $loanAreaId,
                         'field_officer_id' => $loanOfficerId,
@@ -227,6 +232,7 @@ class OnboardingController extends Controller
                         'amount' => $loan['requested_amount'],
                         'interest_rate' => $product->interest_rate,
                         'term' => $loan['requested_term'],
+                        'installment_amount' => $installment,
                         'disbursement_date' => $loan['disbursement_date'],
                         'first_due_date' => $loan['first_due_date'],
                         'payment_method' => $loan['payment_method'],

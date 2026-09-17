@@ -46,7 +46,7 @@ class LoanDisbursementService
                 'interest_type' => $product->interest_type,
                 'term' => $term,
                 'frequency' => $product->frequency,
-                'installment_amount' => 0,
+                'installment_amount' => (float) ($data['installment_amount'] ?? $application->installment_amount ?? $application->approved_installment ?? 0),
                 'processing_fee' => $product->processing_fee,
                 'insurance_fee' => $product->insurance_fee,
                 'total_interest' => 0,
