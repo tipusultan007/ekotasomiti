@@ -53,9 +53,9 @@
                     </select>
                 </div>
                 <div class="col-md-6">
-                    <label class="form-label">{{ __('Fund Contribution per Installment') }}</label>
-                    <input type="number" step="0.01" name="fund_contribution" class="form-control" value="{{ old('fund_contribution', $program->fund_contribution ?? 0) }}" placeholder="e.g. 50">
-                    <div class="form-text small">{{ __('Amount deducted from installment and transferred to fund (e.g. ৳50).') }}</div>
+                    <label class="form-label">{{ __('Fund Contribution per ৳3,000') }}</label>
+                    <input type="number" step="0.01" name="fund_contribution" class="form-control" value="{{ old('fund_contribution', $program->fund_contribution ?? 50) }}" placeholder="e.g. 50">
+                    <div class="form-text small">{{ __('For monthly savings: ৳50 is deducted for every ৳3,000 installment (e.g. ৳50 for 3,000, ৳100 for 6,000, ৳150 for 9,000).') }}</div>
                 </div>
                 <div class="col-md-6">
                     <label class="form-label">{{ __('Status') }}</label>

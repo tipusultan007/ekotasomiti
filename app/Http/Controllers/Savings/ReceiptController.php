@@ -49,7 +49,6 @@ class ReceiptController extends Controller
 
     protected function savings(int $id, string $orgName, string $orgAddress, string $orgPhone, bool $withdrawal = false): array
     {
-        $txn = SavingsTransaction::with(['member', 'account.program', 'fieldOfficer', 'receiver'])->find($id);
         $txn = SavingsTransaction::with(['member', 'account.program.fund', 'fundTransaction.fund', 'fieldOfficer', 'receiver'])->find($id);
 
         if (! $txn) {

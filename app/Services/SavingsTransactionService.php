@@ -28,18 +28,15 @@ class SavingsTransactionService
         $fundAmount = 0.0;
         $fund = null;
 
-        if ($account->program && $account->program->fund_id && (float) $account->program->fund_contribution > 0) {
-            $contribution = (float) $account->program->fund_contribution;
-            if ($grossAmount >= $contribution) {
-                $fundAmount = $contribution;
-                $fund = $account->program->fund;
-            }
-        } elseif ($account->program && $account->program->frequency === 'monthly') {
-            // Global default for all monthly savings accounts: 50 Tk to global Welfare Fund
-            $globalFund = \App\Models\Fund::where('code', 'WF')->orWhere('type', 'welfare')->first();
-            if ($globalFund && $grossAmount >= 50.00) {
-                $fundAmount = 50.00;
-                $fund = $globalFund;
+        // Welfare fund deduction: ONLY applicable for monthly savings (50 Tk for every 3,000 Tk)
+        if ($account->program && $account->program->frequency === 'monthly') {
+            $fund = $account->program->fund ?? \App\Models\Fund::where('code', 'WF')->orWhere('type', 'welfare')->first();
+            if ($fund && $grossAmount >= 3000.00) {
+                $ratePerUnit = (float) ($account->program->fund_contribution > 0 ? $account->program->fund_contribution : 50.00);
+                $units = (int) floor($grossAmount / 3000.00);
+                $fundAmount = $units * $ratePerUnit;
+            } else {
+                $fund = null;
             }
         }
 

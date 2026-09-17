@@ -34,7 +34,6 @@
             <tr><td style="width:40%;">{{ __('Member') }}</td><td class="fw-semibold">{{ $member->name }} ({{ $member->member_no }})</td></tr>
             <tr><td>{{ __('Account No') }}</td><td class="fw-semibold">{{ $accountNo }}</td></tr>
             <tr><td>{{ __('Program') }}</td><td>{{ $program }}</td></tr>
-            <tr><td>{{ __($typeLabel) }} {{ __('Amount') }}</td><td class="fw-bold text-success">৳{{ number_format($amount, 2) }}</td></tr>
             @if (!empty($fundAmount) && $fundAmount > 0)
                 <tr><td>{{ __('Total Paid') }}</td><td class="fw-bold text-primary">৳{{ number_format($grossAmount, 2) }}</td></tr>
                 <tr><td>{{ __('Savings Deposit') }}</td><td class="fw-semibold text-success">৳{{ number_format($amount, 2) }}</td></tr>

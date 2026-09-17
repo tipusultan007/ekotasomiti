@@ -135,12 +135,10 @@ class DatabaseSeeder extends Seeder
         $programs = [
             ['code' => 'DS', 'name' => 'Daily Savings', 'frequency' => 'daily', 'prefix' => 'DS', 'min_deposit' => 100, 'expected_deposit' => 100],
             ['code' => 'WS', 'name' => 'Weekly Savings', 'frequency' => 'weekly', 'prefix' => 'WS', 'min_deposit' => 500, 'expected_deposit' => 500],
-            ['code' => 'MS', 'name' => 'Monthly Savings', 'frequency' => 'monthly', 'prefix' => 'MS', 'min_deposit' => 1000, 'expected_deposit' => 1000],
             ['code' => 'MS', 'name' => 'Monthly Savings', 'frequency' => 'monthly', 'prefix' => 'MS', 'min_deposit' => 3000, 'expected_deposit' => 3000, 'fund_id' => $welfareFund->id, 'fund_contribution' => 50],
         ];
 
         foreach ($programs as $program) {
-            SavingsProgram::firstOrCreate(['code' => $program['code']], $program + ['status' => 'active']);
             SavingsProgram::updateOrCreate(['code' => $program['code']], $program + ['status' => 'active']);
         }
 

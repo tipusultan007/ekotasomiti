@@ -240,5 +240,99 @@ class FundManagementTest extends TestCase
         $this->assertEquals('debit', $txn->direction);
         $this->assertEquals($this->member->id, $txn->member_id);
     }
+
+    public function test_monthly_savings_proportional_fund_deduction(): void
+    {
+        // 1. Test 6000 Tk deposit -> 100 Tk to fund, 5900 Tk to savings
+        $response1 = $this->actingAs($this->admin)->post(route('savings.deposits.store'), [
+            'account_id' => $this->account->id,
+            'amount' => 6000,
+            'txn_date' => now()->toDateString(),
+            'payment_method' => 'cash',
+        ]);
+        $response1->assertSessionHasNoErrors();
+        $this->account->refresh();
+        $this->fund->refresh();
+
+        $this->assertEquals(5900.00, (float) $this->account->current_balance);
+        $this->assertEquals(100.00, (float) $this->fund->current_balance);
+
+        $txn1 = SavingsTransaction::where('savings_account_id', $this->account->id)->latest('id')->first();
+        $this->assertEquals(6000.00, (float) $txn1->gross_amount);
+        $this->assertEquals(100.00, (float) $txn1->fund_amount);
+        $this->assertEquals(5900.00, (float) $txn1->amount);
+
+        // 2. Test 9000 Tk deposit -> 150 Tk to fund, 8850 Tk to savings
+        // Create second account to test isolation
+        $account2 = SavingsAccount::create([
+            'account_no' => 'MS-TEST-0002',
+            'member_id' => $this->member->id,
+            'savings_program_id' => $this->monthlyProgram->id,
+            'area_id' => $this->area->id,
+            'opening_date' => now()->toDateString(),
+            'opening_balance' => 0,
+            'current_balance' => 0,
+            'status' => 'active',
+            'created_by' => $this->admin->id,
+        ]);
+
+        $response2 = $this->actingAs($this->admin)->post(route('savings.deposits.store'), [
+            'account_id' => $account2->id,
+            'amount' => 9000,
+            'txn_date' => now()->toDateString(),
+            'payment_method' => 'cash',
+        ]);
+        $response2->assertSessionHasNoErrors();
+        $account2->refresh();
+        $this->fund->refresh();
+
+        $this->assertEquals(8850.00, (float) $account2->current_balance);
+        // Fund balance was 100 + 150 = 250
+        $this->assertEquals(250.00, (float) $this->fund->current_balance);
+
+        $txn2 = SavingsTransaction::where('savings_account_id', $account2->id)->latest('id')->first();
+        $this->assertEquals(9000.00, (float) $txn2->gross_amount);
+        $this->assertEquals(150.00, (float) $txn2->fund_amount);
+        $this->assertEquals(8850.00, (float) $txn2->amount);
+    }
+
+    public function test_non_monthly_savings_does_not_deduct_fund(): void
+    {
+        $dailyProgram = SavingsProgram::where('code', 'DS')->first();
+        $dailyAccount = SavingsAccount::create([
+            'account_no' => 'DS-TEST-0001',
+            'member_id' => $this->member->id,
+            'savings_program_id' => $dailyProgram->id,
+            'area_id' => $this->area->id,
+            'opening_date' => now()->toDateString(),
+            'opening_balance' => 0,
+            'current_balance' => 0,
+            'status' => 'active',
+            'created_by' => $this->admin->id,
+        ]);
+
+        $fundBalanceBefore = (float) $this->fund->refresh()->current_balance;
+
+        // Deposit 3000 into daily savings
+        $response = $this->actingAs($this->admin)->post(route('savings.deposits.store'), [
+            'account_id' => $dailyAccount->id,
+            'amount' => 3000,
+            'txn_date' => now()->toDateString(),
+            'payment_method' => 'cash',
+        ]);
+        $response->assertSessionHasNoErrors();
+        $dailyAccount->refresh();
+        $this->fund->refresh();
+
+        // 3000 goes 100% to savings, 0 to fund
+        $this->assertEquals(3000.00, (float) $dailyAccount->current_balance);
+        $this->assertEquals($fundBalanceBefore, (float) $this->fund->current_balance);
+
+        $txn = SavingsTransaction::where('savings_account_id', $dailyAccount->id)->first();
+        $this->assertEquals(3000.00, (float) $txn->gross_amount);
+        $this->assertEquals(0.00, (float) $txn->fund_amount);
+        $this->assertEquals(3000.00, (float) $txn->amount);
+        $this->assertNull($txn->fund_transaction_id);
+    }
 }
 
