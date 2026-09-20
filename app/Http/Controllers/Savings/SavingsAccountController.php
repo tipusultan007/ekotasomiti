@@ -208,7 +208,32 @@ class SavingsAccountController extends Controller
         return view('savings.accounts.transactions', compact('account'));
     }
 
-    public function reverse(SavingsTransaction $transaction)
+    public function updateTransaction(Request $request, SavingsTransaction $transaction)
+    {
+        $this->authorize('reverse transactions');
+
+        if (! in_array($transaction->type, ['deposit', 'account_opening', 'withdrawal'])) {
+            return back()->with('error', __('Only deposit, opening, and withdrawal transactions can be edited.'));
+        }
+
+        $data = $request->validate([
+            'amount' => 'required|numeric|gt:0',
+            'txn_date' => 'required|date',
+            'notes' => 'nullable|string|max:255',
+        ]);
+
+        try {
+            app(SavingsTransactionService::class)->update($transaction, $data);
+        } catch (\RuntimeException $e) {
+            return back()->with('error', __($e->getMessage()));
+        }
+
+        AuditLog::record('savings_transaction.edited', $transaction, [], $transaction->toArray());
+
+        return back()->with('success', __('Savings transaction :no updated successfully.', ['no' => $transaction->txn_no]));
+    }
+
+    public function destroyTransaction(SavingsTransaction $transaction)
     {
         $this->authorize('reverse transactions');
 
@@ -221,6 +246,11 @@ class SavingsAccountController extends Controller
         AuditLog::record('savings_transaction.deleted', $transaction, $transaction->toArray(), []);
 
         return back()->with('success', __('Savings transaction :no deleted. The account balance and cash entry were restored.', ['no' => $transaction->txn_no]));
+    }
+
+    public function reverse(SavingsTransaction $transaction)
+    {
+        return $this->destroyTransaction($transaction);
     }
 
     public function closeForm(SavingsAccount $account)

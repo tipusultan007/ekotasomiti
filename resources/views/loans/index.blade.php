@@ -52,7 +52,11 @@
             <tbody>
                 @forelse ($loans as $loan)
                     <tr>
-                        <td class="fw-semibold">{{ $loan->loan_no }}</td>
+                        <td class="fw-semibold">
+                            <a href="{{ route('loans.show', $loan) }}" class="text-primary text-decoration-none">
+                                <i class="bi bi-credit-card me-1 text-muted"></i>{{ $loan->loan_no }}
+                            </a>
+                        </td>
                         <td><a href="{{ route('members.show', $loan->member) }}">{{ $loan->member->name }}</a></td>
                         <td>
                             @php

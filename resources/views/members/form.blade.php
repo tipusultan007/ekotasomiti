@@ -113,7 +113,6 @@
                 </div>
                 <div class="card-body">
                     <div id="nominees">
-                        @php $oldNominees = old('nominees', $member->exists ? $member->nominees->toArray() : [['name' => '']]); @endphp
                         @php $oldNominees = old('nominees', $member->exists ? $member->nominees->toArray() : []); @endphp
                         @foreach ($oldNominees as $index => $nominee)
                             <div class="row g-2 nominee-row mb-2 align-items-center">
@@ -237,7 +236,6 @@
 
 @push('scripts')
 <script>
-    let nomineeIndex = {{ count(old('nominees', $member->exists ? $member->nominees : [])) }};
     let nomineeIndex = {{ count($oldNominees) }};
 
     function toggleNomineeEmpty() {

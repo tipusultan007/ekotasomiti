@@ -99,7 +99,6 @@
                 </div>
                 <div class="card-body">
                     <div id="nominees">
-                        @php $oldNominees = old('nominees', [['name' => '']]); @endphp
                         @php $oldNominees = old('nominees', []); @endphp
                         @foreach ($oldNominees as $index => $nominee)
                             <div class="row g-2 nominee-row mb-2 align-items-center">
@@ -177,11 +176,9 @@
                     <div class="row g-3">
                         <div class="col-md-6">
                             <label class="form-label">{{ __('Loan Product') }} <span class="text-danger">*</span></label>
-                            <select name="loan[loan_product_id]" class="form-select select2">
                             <select name="loan[loan_product_id]" id="onboard_loan_product_id" class="form-select select2">
                                 <option value="">{{ __('Select Product') }}</option>
                                 @foreach ($products as $product)
-                                    <option value="{{ $product->id }}" @selected(old('loan.loan_product_id') == $product->id)>{{ __($product->name) }}</option>
                                     <option value="{{ $product->id }}"
                                         data-rate="{{ $product->interest_rate }}"
                                         data-type="{{ $product->interest_type ?? 'flat' }}"
@@ -386,7 +383,6 @@
     toggleLoan();
 
     // Nominees
-    let nomineeIndex = {{ count(old('nominees', [['name' => '']])) }};
     let nomineeIndex = {{ count($oldNominees) }};
     function toggleNomineeEmpty() {
         document.getElementById('nomineeEmpty')?.classList.toggle('d-none', document.querySelectorAll('.nominee-row').length > 0);

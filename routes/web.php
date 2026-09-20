@@ -74,6 +74,7 @@ Route::middleware('auth')->group(function () {
         Route::resource('programs', SavingsProgramController::class)->except(['show']);
         Route::get('accounts/member-details/{member}', [SavingsAccountController::class, 'memberDetails'])->name('accounts.member-details');
         Route::resource('accounts', SavingsAccountController::class)->except(['show']);
+        Route::get('accounts/{account}', fn (\App\Models\SavingsAccount $account) => redirect()->route('savings.accounts.transactions', $account))->name('accounts.show');
         Route::get('accounts/{account}/transactions', [SavingsAccountController::class, 'transactions'])->name('accounts.transactions');
         Route::get('accounts/{account}/close', [SavingsAccountController::class, 'closeForm'])->name('accounts.close-form');
         Route::post('accounts/{account}/close', [SavingsAccountController::class, 'close'])->name('accounts.close');
@@ -89,6 +90,8 @@ Route::middleware('auth')->group(function () {
         Route::get('receipts/{type}/{id}', [ReceiptController::class, 'show'])->name('receipts.show');
         Route::get('receipts/{type}/{id}/pdf', [ReceiptController::class, 'pdf'])->name('receipts.pdf');
 
+        Route::post('transactions/{transaction}/edit', [SavingsAccountController::class, 'updateTransaction'])->name('transactions.update');
+        Route::post('transactions/{transaction}/delete', [SavingsAccountController::class, 'destroyTransaction'])->name('transactions.destroy');
         Route::post('transactions/{transaction}/reverse', [SavingsAccountController::class, 'reverse'])->name('transactions.reverse');
     });
 
@@ -100,6 +103,8 @@ Route::middleware('auth')->group(function () {
         Route::get('/', [LoanController::class, 'index'])->name('index');
         Route::get('overdue', [LoanController::class, 'overdue'])->name('overdue');
         Route::get('repayments', [LoanController::class, 'repayments'])->name('repayments.index');
+        Route::post('transactions/{transaction}/edit', [LoanController::class, 'updateTransaction'])->name('transactions.update');
+        Route::post('transactions/{transaction}/delete', [LoanController::class, 'destroyTransaction'])->name('transactions.destroy');
         Route::post('repayments/{transaction}/reverse', [LoanController::class, 'reverseRepayment'])->name('repayments.reverse');
         Route::post('{loan}/write-off', [LoanController::class, 'writeOff'])->name('write-off');
         Route::get('{loan}', [LoanController::class, 'show'])->name('show');

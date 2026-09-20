@@ -229,7 +229,37 @@ class LoanController extends Controller
         return view('loans.repayments', compact('transactions'));
     }
 
-    public function reverseRepayment(LoanTransaction $transaction)
+    public function updateTransaction(Request $request, LoanTransaction $transaction)
+    {
+        $this->authorize('reverse transactions');
+
+        if ($transaction->type !== 'repayment') {
+            return back()->with('error', __('Only loan repayment transactions can be edited here.'));
+        }
+
+        $data = $request->validate([
+            'amount' => 'required|numeric|gt:0',
+            'collection_date' => 'nullable|date',
+            'txn_date' => 'nullable|date',
+            'notes' => 'nullable|string|max:255',
+        ]);
+
+        if (empty($data['collection_date'])) {
+            $data['collection_date'] = $data['txn_date'] ?? now()->toDateString();
+        }
+
+        try {
+            $txn = app(LoanRepaymentService::class)->update($transaction, $data);
+        } catch (\RuntimeException $e) {
+            return back()->with('error', __($e->getMessage()));
+        }
+
+        AuditLog::record('loan_repayment.edited', $txn, [], $txn->toArray());
+
+        return back()->with('success', __('Loan repayment :no updated successfully.', ['no' => $txn->txn_no]));
+    }
+
+    public function destroyTransaction(LoanTransaction $transaction)
     {
         $this->authorize('reverse transactions');
 
@@ -243,7 +273,14 @@ class LoanController extends Controller
             return back()->with('error', $e->getMessage());
         }
 
-        return back()->with('success', __('Repayment deleted successfully. Loan balances and cash entries were restored.'));
+        AuditLog::record('loan_repayment.deleted', $transaction, $transaction->toArray(), []);
+
+        return back()->with('success', __('Loan repayment :no deleted. Loan balances and cash entries were restored.', ['no' => $transaction->txn_no]));
+    }
+
+    public function reverseRepayment(LoanTransaction $transaction)
+    {
+        return $this->destroyTransaction($transaction);
     }
 
     public function collectionSheet(Loan $loan)

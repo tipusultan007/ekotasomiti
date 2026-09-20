@@ -55,7 +55,11 @@
                 <tbody>
                     @forelse ($accounts as $account)
                         <tr>
-                            <td class="fw-semibold">{{ $account->account_no }}</td>
+                            <td class="fw-semibold">
+                                <a href="{{ route('savings.accounts.transactions', $account) }}" class="text-primary text-decoration-none">
+                                    <i class="bi bi-wallet2 me-1 text-muted"></i>{{ $account->account_no }}
+                                </a>
+                            </td>
                             <td><a href="{{ route('members.show', $account->member) }}">{{ $account->member->name }}</a></td>
                             <td>
                                 @php
@@ -89,8 +93,8 @@
                                     <ul class="dropdown-menu dropdown-menu-end shadow-sm border-0 py-2" style="min-width: 190px; border-radius: 12px; box-shadow: 0 10px 25px -5px rgba(0,0,0,0.1), 0 8px 10px -6px rgba(0,0,0,0.1) !important;">
                                         <li>
                                             <a class="dropdown-item d-flex align-items-center gap-2 py-2 text-dark" href="{{ route('savings.accounts.transactions', $account) }}">
-                                                <i class="bi bi-clock-history text-primary"></i>
-                                                <span>{{ __('Transaction History') }}</span>
+                                                <i class="bi bi-eye text-primary"></i>
+                                                <span>{{ __('Savings Details') }}</span>
                                             </a>
                                         </li>
                                         @if ($account->status === 'active')

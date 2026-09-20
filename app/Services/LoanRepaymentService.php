@@ -82,7 +82,7 @@ class LoanRepaymentService
 
         return DB::transaction(function () use ($transaction, $data, $amount) {
             $loan = $transaction->loan;
-            $date = $data['collection_date'] ?? $transaction->collection_date?->toDateString() ?? now()->toDateString();
+            $date = $data['collection_date'] ?? $data['txn_date'] ?? $transaction->collection_date?->toDateString() ?? now()->toDateString();
 
             $this->undoAllocation($transaction);
 

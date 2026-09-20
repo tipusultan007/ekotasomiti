@@ -81,21 +81,55 @@
         <div class="card shadow-sm">
             <div class="card-header bg-white fw-semibold">{{ __('Transactions') }}</div>
             <div class="card-body p-0">
-                <table class="table table-sm mb-0">
-                    <thead><tr><th>{{ __('Ref') }}</th><th>{{ __('Date') }}</th><th>{{ __('Type') }}</th><th class="text-end">{{ __('Amount') }}</th></tr></thead>
-                    <tbody>
-                        @forelse ($loan->transactions->sortByDesc('txn_date') as $txn)
+                <div class="table-responsive">
+                    <table class="table table-sm align-middle mb-0">
+                        <thead>
                             <tr>
-                                <td><a href="{{ route('savings.receipts.show', ['type' => 'loan', 'id' => $txn->id]) }}">{{ $txn->txn_no }}</a></td>
-                                <td>{{ $txn->txn_date->format('d-m-Y') }}</td>
-                                <td>{{ __(ucfirst($txn->type)) }}</td>
-                                <td class="amount {{ $txn->type === 'repayment' ? 'text-success' : 'text-danger' }}">৳{{ number_format($txn->amount, 2) }}</td>
+                                <th>{{ __('Ref') }}</th>
+                                <th>{{ __('Date') }}</th>
+                                <th>{{ __('Type') }}</th>
+                                <th class="text-end">{{ __('Amount') }}</th>
+                                @if(auth()->user()->hasAnyRole(['admin', 'super_admin', 'manager']) || auth()->user()->can('reverse transactions'))
+                                    <th class="text-end">{{ __('Action') }}</th>
+                                @endif
                             </tr>
-                        @empty
-                            <tr><td colspan="4" class="text-center text-muted py-3">{{ __('No transactions.') }}</td></tr>
-                        @endforelse
-                    </tbody>
-                </table>
+                        </thead>
+                        <tbody>
+                            @forelse ($loan->transactions->sortByDesc('txn_date') as $txn)
+                                <tr>
+                                    <td><a href="{{ route('savings.receipts.show', ['type' => 'loan', 'id' => $txn->id]) }}">{{ $txn->txn_no }}</a></td>
+                                    <td>{{ $txn->txn_date->format('d-m-Y') }}</td>
+                                    <td>{{ __(ucfirst($txn->type)) }}</td>
+                                    <td class="amount {{ $txn->type === 'repayment' ? 'text-success' : 'text-danger' }}">৳{{ number_format($txn->amount, 2) }}</td>
+                                    @if(auth()->user()->hasAnyRole(['admin', 'super_admin', 'manager']) || auth()->user()->can('reverse transactions'))
+                                        <td class="text-end">
+                                            @if ($txn->status === 'posted' && $txn->type === 'repayment')
+                                                <button type="button" class="btn btn-sm btn-outline-primary" data-bs-toggle="modal" data-bs-target="#editLoanTxnModal"
+                                                    data-action="{{ route('loans.transactions.update', $txn) }}"
+                                                    data-txn-no="{{ $txn->txn_no }}"
+                                                    data-amount="{{ $txn->amount }}"
+                                                    data-date="{{ $txn->collection_date?->toDateString() ?? $txn->txn_date->toDateString() }}"
+                                                    data-notes="{{ $txn->notes }}" title="{{ __('Edit') }}">
+                                                    <i class="bi bi-pencil"></i>
+                                                </button>
+                                                <form method="POST" action="{{ route('loans.transactions.destroy', $txn) }}" class="d-inline" data-confirm="{{ __('Delete repayment :no? This will undo schedule payments, restore loan outstanding balance, and delete the linked cash entry.', ['no' => $txn->txn_no]) }}">
+                                                    @csrf
+                                                    <button type="submit" class="btn btn-sm btn-outline-danger" title="{{ __('Delete') }}">
+                                                        <i class="bi bi-trash"></i>
+                                                    </button>
+                                                </form>
+                                            @else
+                                                <span class="text-muted">—</span>
+                                            @endif
+                                        </td>
+                                    @endif
+                                </tr>
+                            @empty
+                                <tr><td colspan="{{ (auth()->user()->hasAnyRole(['admin', 'super_admin', 'manager']) || auth()->user()->can('reverse transactions')) ? 5 : 4 }}" class="text-center text-muted py-3">{{ __('No transactions.') }}</td></tr>
+                            @endforelse
+                        </tbody>
+                    </table>
+                </div>
             </div>
         </div>
     </div>
@@ -126,4 +160,61 @@
         </div>
     </div>
 </div>
+
+{{-- EDIT LOAN REPAYMENT MODAL --}}
+<div class="modal fade" id="editLoanTxnModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <form method="POST" id="editLoanTxnForm">
+            @csrf
+            <div class="modal-content border-0 shadow-lg" style="border-radius: 16px;">
+                <div class="modal-header bg-success text-white">
+                    <h5 class="modal-title fw-bold"><i class="bi bi-pencil-square me-2"></i>{{ __('Edit Loan Repayment') }}</h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body p-4">
+                    <div class="mb-3">
+                        <label class="form-label text-muted small fw-semibold">{{ __('Transaction No') }}</label>
+                        <input type="text" class="form-control bg-light font-monospace" id="editLoanTxnNo" disabled>
+                    </div>
+                    <div class="row g-3">
+                        <div class="col-6">
+                            <label class="form-label text-muted small fw-semibold">{{ __('Amount') }} (৳)</label>
+                            <input type="number" name="amount" step="0.01" min="0.01" class="form-control fw-bold fs-5 text-success" id="editLoanTxnAmount" required>
+                        </div>
+                        <div class="col-6">
+                            <label class="form-label text-muted small fw-semibold">{{ __('Collection Date') }}</label>
+                            <input type="date" name="collection_date" class="form-control" id="editLoanTxnDate" required>
+                        </div>
+                    </div>
+                    <div class="mb-3 mt-3">
+                        <label class="form-label text-muted small fw-semibold">{{ __('Note') }}</label>
+                        <textarea name="notes" class="form-control" id="editLoanTxnNotes" rows="2" placeholder="{{ __('Optional remarks...') }}"></textarea>
+                    </div>
+                </div>
+                <div class="modal-footer bg-light border-0">
+                    <button type="button" class="btn btn-light rounded-pill px-3" data-bs-dismiss="modal">{{ __('Cancel') }}</button>
+                    <button type="submit" class="btn btn-success rounded-pill px-4 fw-bold"><i class="bi bi-check-lg me-1"></i>{{ __('Save Changes') }}</button>
+                </div>
+            </div>
+        </form>
+    </div>
+</div>
 @endsection
+
+@push('scripts')
+<script>
+    (function () {
+        const form = document.getElementById('editLoanTxnForm');
+        if (!form) return;
+        document.querySelectorAll('button[data-bs-target="#editLoanTxnModal"]').forEach(function (btn) {
+            btn.addEventListener('click', function () {
+                form.action = btn.dataset.action;
+                document.getElementById('editLoanTxnNo').value = btn.dataset.txnNo;
+                document.getElementById('editLoanTxnAmount').value = btn.dataset.amount;
+                document.getElementById('editLoanTxnDate').value = btn.dataset.date;
+                document.getElementById('editLoanTxnNotes').value = btn.dataset.notes || '';
+            });
+        });
+    })();
+</script>
+@endpush
